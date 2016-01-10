@@ -26,11 +26,15 @@ class Blake2b(object):
              (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15),
              (14,10,4,8,9,15,13,6,1,12,0,2,11,7,5,3))
 
-    def __init__(self, data=b'', key=b''):
+    def __init__(self, data=b'', key=b'', digest_length=64):
         # default parameter block for sequential Blake2b with 128 byte
         # digest and key.
-        P = [0x0000000001010040, 0, 0, 0, 0, 0, 0, 0]
-        P[0] |= (len(key) & 0xff) << 8
+        assert 0 <= len(key) <= 128
+        assert 0 < digest_length <= 64
+        P = [0x0000000001010000, 0, 0, 0, 0, 0, 0, 0]
+        P[0] |= len(key) << 8
+        P[0] |= digest_length
+        self._digest_length = digest_length
         self._buf = b''  # data that didn't fit in a block yet
         self._h = [self.IV[i] ^ P[i] for i in range(8)]  # current hash
         self._t = [0, 0]  # counter
@@ -38,7 +42,6 @@ class Blake2b(object):
         self._N = 0
         self.finalized = False
 
-        assert 0 <= len(key) <= 128
 
         if key:
             self.update(key + b'\0' * (128 - len(key)))
@@ -74,7 +77,7 @@ class Blake2b(object):
             buf = self._buf + b'\0' * (128 - len(self._buf))
             self._f[0] = 0xffffffffffffffff
             self._compress(buf, n_remaining)
-            self._digest = struct.pack('<8Q', *self._h)
+            self._digest = struct.pack('<8Q', *self._h)[:self._digest_length]
             self.finalized = True
         return self._digest
     digest = final
