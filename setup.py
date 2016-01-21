@@ -24,7 +24,7 @@ setup(
     url='http://github.com/bwesterb/argon2pure',
     license='MIT',
     zip_safe=True,
-    install_requires=install_requires,
+    install_requires=['six'],
     py_modules='argon2pure',
     test_suite='test_argon2pure',
     classifiers = [

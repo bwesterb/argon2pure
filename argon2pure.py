@@ -1,9 +1,222 @@
 """ Pure Python implementation of the Argon2 password hash. """
 
+import six
 from six.moves import range
+from six import BytesIO
 
 import struct
 import binascii
+
+__all__ = [
+    'argon2',
+    'ARGON2D',
+    'ARGON2I',
+    'Argon2Error',
+    'Argon2ParameterError']
+
+ARGON2I = 1
+ARGON2D = 0
+
+class Argon2Error(Exception):
+    pass
+
+class Argon2ParameterError(Argon2Error):
+    pass
+
+def argon2(password, salt, time_cost, memory_cost, parallelism,
+                tag_length, secret=b'', associated_data=b'', type_code=1):
+    # Compute the pre-hasing digest
+    h = Blake2b()
+    h.update(struct.pack("<iiiiii", parallelism,
+                                    tag_length,
+                                    memory_cost,
+                                    time_cost,
+                                    0x10,
+                                    type_code))
+    h.update(struct.pack("<i", len(password)))
+    h.update(password)
+    h.update(struct.pack("<i", len(salt)))
+    h.update(salt)
+    h.update(struct.pack("<i", len(secret)))
+    h.update(secret)
+    h.update(struct.pack("<i", len(associated_data)))
+    h.update(associated_data)
+    #print h.hexdigest()
+    H0 = h.digest()
+
+    m_prime = (memory_cost // (4 * parallelism)) * (4 * parallelism)
+    q = m_prime / parallelism  # lane_length
+    segment_length = q / 4
+
+    if type_code not in (0, 1):
+        raise Argon2ParameterError("type_code %s not supported" % type_code)
+
+    # Allocate the matrix.
+    B = [[None for j in range(q)] for i in range(parallelism)]
+
+    for t in range(time_cost):
+        if t == 0:
+            # Compute first two columns
+            for i in range(parallelism):
+                B[i][0] = _H_prime(H0 + struct.pack('<II', 0, i), 1024)
+                B[i][1] = _H_prime(H0 + struct.pack('<II', 1, i), 1024)
+            j_start = 2
+        else:
+            j_start = 0
+
+        # Compute remaining columns
+        for j in range(j_start, q):
+            for i in range(parallelism):
+                # See `section 3.3. Indexing' of argon2 spec.
+                if type_code == ARGON2D:
+                    J1, J2 = struct.unpack_from('<II', B[i][(j-1)%q][:8])
+                elif type_code == ARGONI:
+                    pass
+                    # TODO
+                else:
+                    assert False
+
+                i_prime = J2 % parallelism
+
+                index = j % (q / 4)
+                segment = j // (q / 4)
+
+                if t == 0:
+                    if segment == 0:
+                        ref_area_size = index - 1  # TODO same as next case?
+                    elif i == i_prime:  # same_lane
+                        ref_area_size = j - 1
+                    elif index == 0:
+                        ref_area_size = segment * segment_length - 1
+                    else:
+                        ref_area_size = segment * segment_length
+                elif i == i_prime:  # same_lane
+                    ref_area_size = q - segment_length + index - 1
+                elif index == 0:
+                    ref_area_size = q - segment_length - 1
+                else:
+                    ref_area_size = q - segment_length
+
+                rel_pos = (J1 ** 2) >> 32
+                rel_pos = ref_area_size - 1 - ((ref_area_size * rel_pos) >> 32)
+                start_pos = 0
+
+                if t != 0 and segment != 3:
+                    start_pos = (segment + 1) * segment_length
+                j_prime = (start_pos + rel_pos) % q
+
+                #print 'J1=%s J2=%s i=%s j=%s   i\'=%s j\'=%s' % (
+                #        J1, J2, i, j, i_prime, j_prime)
+                #print 'ref: ', binascii.hexlify(B[i_prime][j_prime])
+                #print 'prev: ', binascii.hexlify(B[i][(j-1)%q])
+                B[i][j] = _compress(B[i][(j-1)%q], B[i_prime][j_prime])
+                #print 'next: ', binascii.hexlify(B[i][j][:8])
+
+    B_final = b'\0' * 1024
+
+    for i in range(parallelism):
+        B_final = xor(B_final, B[i][q-1])
+
+    return _H_prime(B_final, tag_length)
+
+
+if six.PY3:
+    def xor(a, b):
+        return bytes([a[i] ^ b[i] for i in range(len(a))])
+else:
+    def xor(a, b):
+        return ''.join([chr(ord(a[i]) ^ ord(b[i])) for i in range(len(a))])
+
+
+def _compress(X, Y):
+    """ Argon2's compression function G.
+
+    This function is based on Blake2's compression function.
+    For the definition, see section 3.4 of Argon2's specification. """
+    R = xor(X, Y)
+    Q = []
+    Z = [None]*64
+    for i in range(0, 64, 8):
+        Q.extend(_P(R[i    *16:(i+1)*16],
+                    R[(i+1)*16:(i+2)*16],
+                    R[(i+2)*16:(i+3)*16],
+                    R[(i+3)*16:(i+4)*16],
+                    R[(i+4)*16:(i+5)*16],
+                    R[(i+5)*16:(i+6)*16],
+                    R[(i+6)*16:(i+7)*16],
+                    R[(i+7)*16:(i+8)*16]))
+    for i in range(8):
+        out = _P(Q[i], Q[i+8], Q[i+16], Q[i+24],
+                    Q[i+32], Q[i+40], Q[i+48], Q[i+56])
+        for j in range(8):
+            Z[i + j*8] = out[j]
+    return xor(b''.join(Z), R)
+
+
+def _P(S0, S1, S2, S3, S4, S5, S6, S7):
+    """ Permutation used in Argon2's compression function G.
+
+    It is a modification of the permutation used in Blake2.
+    See Appendix A of the specification of Argon2. """
+    S = (S0, S1, S2, S3, S4, S5, S6, S7)
+    v = [None] * 16
+    for i in range(8):
+        tmp1, tmp2 = struct.unpack_from('<QQ', S[i])
+        v[2*i] = tmp1
+        v[2*i+1] = tmp2
+    _G(v, 0, 4, 8, 12)
+    _G(v, 1, 5, 9, 13)
+    _G(v, 2, 6, 10, 14)
+    _G(v, 3, 7, 11, 15)
+    _G(v, 0, 5, 10, 15)
+    _G(v, 1, 6, 11, 12)
+    _G(v, 2, 7, 8, 13)
+    _G(v, 3, 4, 9, 14)
+    ret =  [struct.pack("<QQ", v[2*i], v[2*i+1]) for i in range(8)]
+    return ret
+
+
+def _G(v, a, b, c, d):
+    """ Quarter-round of the permutation used in the compression of Argon2.
+
+    It is a modification of the quarter-round used in Blake2, which in turn
+    is a modification of ChaCha.  See Appendix A of the specification of
+    Argon2. """
+    v[a] = (v[a] + v[b] + 2 * (v[a] & 0xffffffff) * (v[b] & 0xffffffff)
+                ) & 0xffffffffffffffff
+    tmp = v[d] ^ v[a]
+    v[d] = (tmp >> 32) | ((tmp << 32) & 0xffffffffffffffff)
+    v[c] = (v[c] + v[d] + 2 * (v[c] & 0xffffffff) * (v[d] & 0xffffffff)
+                ) & 0xffffffffffffffff
+    tmp = v[b] ^ v[c]
+    v[b] = (tmp >> 24) | ((tmp << 40) & 0xffffffffffffffff)
+    v[a] = (v[a] + v[b] + 2 * (v[a] & 0xffffffff) * (v[b] & 0xffffffff)
+                ) & 0xffffffffffffffff
+    tmp = v[d] ^ v[a]
+    v[d] = (tmp >> 16) | ((tmp << 48) & 0xffffffffffffffff)
+    v[c] = (v[c] + v[d] + 2 * (v[c] & 0xffffffff) * (v[d] & 0xffffffff)
+                ) & 0xffffffffffffffff
+    tmp = v[b] ^ v[c]
+    v[b] = (tmp >> 63) | ((tmp << 1) & 0xffffffffffffffff)
+
+
+def _H_prime(X, tag_length):
+    """ Blake2b turned into a "variable-length hash function".
+
+        See definition of H' in section 3.2 of the argon2 spec. """
+    if tag_length <= 64:
+        return Blake2b(struct.pack('<I', tag_length) + X,
+                       digest_length=tag_length).digest()
+    buf = BytesIO()
+    V = Blake2b(struct.pack('<I', tag_length) + X).digest()  # V_1
+    buf.write(V[:32])
+    todo = tag_length - 32
+    while todo > 64:  
+        V = Blake2b(V).digest()  # V_2, ..., V_r
+        buf.write(V[:32])
+        todo -= 32
+    buf.write(Blake2b(V, digest_length=todo).digest())  # V_{r+1}
+    return buf.getvalue()
 
 class Blake2b(object):
     """ Minimal implementation of Blake2b, as required by Argon2. """
@@ -121,3 +334,15 @@ class Blake2b(object):
         tmp = v[b] ^ v[c]
         v[b] = (tmp >> 63) | ((tmp << 1) & 0xffffffffffffffff)
     
+if __name__ == '__main__':
+    print binascii.hexlify(argon2(
+        binascii.unhexlify('01010101010101010101010101010101010101010101010101'
+                           '01010101010101'),
+        binascii.unhexlify('02020202020202020202020202020202'),
+        3,
+        32,
+        4,
+        32,
+        binascii.unhexlify('0303030303030303'),
+        binascii.unhexlify('040404040404040404040404'),
+        ARGON2D))
