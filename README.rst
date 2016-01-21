@@ -6,7 +6,7 @@ Pure Python implementation of Argon2_.
 If you can, use the argon2_cffi_ or pyargon2_ bindings instead.
 
 TODO
-~~~~
+----
 
 - Optimize.
 - Use multiple threads.
