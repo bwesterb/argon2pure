@@ -1,6 +1,9 @@
 """ Pure Python implementation of the Argon2 password hash.
 
-    Bas Westerbaan  <bas@westerbaan.name> """
+    If you can, use the `argon2_cffi' or `argon2' bindings.
+
+    Bas Westerbaan <bas@westerbaan.name> """
+
 
 import six
 from six.moves import range
@@ -26,7 +29,26 @@ class Argon2ParameterError(Argon2Error):
     pass
 
 def argon2(password, salt, time_cost, memory_cost, parallelism,
-                tag_length, secret=b'', associated_data=b'', type_code=1):
+                tag_length=32, secret=b'', associated_data=b'',
+                type_code=ARGON2I):
+    """ Compute the Argon2 hash for *password*.
+
+    :param bytes password: Password to hash
+    :param bytes salt: A salt.  Should be random and different for each
+        password.
+    :param int time_cost: Number of iterations to use.
+    :param int memory_cost: Amount of kibibytes of memory to use.
+    :param int parallelism: Amount of threads that can contribute to
+        the computation of the hash at the same time.
+
+    Optional arguments:
+
+    :param int tag_length: Length of the hash returned
+    :param bytes secret: Optional secret to differentiate hash
+    :param bytes associated_data: Optional associated data
+    :param int type: variant of argon2 to use.  Either ARGON2I or ARGON2D
+
+    :rtype: bytes """
     # Compute the pre-hasing digest
     if parallelism < 0:
         raise Argon2ParameterError("parallelism must be strictly positive")
