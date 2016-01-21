@@ -76,8 +76,8 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
     H0 = h.digest()
 
     m_prime = (memory_cost // (4 * parallelism)) * (4 * parallelism)
-    q = m_prime / parallelism  # lane_length
-    segment_length = q / 4
+    q = m_prime // parallelism  # lane_length
+    segment_length = q // 4
 
     if type_code not in (0, 1):
         raise Argon2ParameterError("type_code %s not supported" % type_code)
@@ -100,8 +100,8 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
 
         # Compute remaining columns
         for j in range(j_start, q):
-            segment = j // (q / 4)  # index of the slice/segment
-            index = j % (q / 4)     # index within the segment/slice
+            segment = j // (q // 4)  # index of the slice/segment
+            index = j % (q // 4)     # index within the segment/slice
 
             # Argon2i computes a bunch of pseudo-random numbers
             # for every segment.
@@ -115,12 +115,12 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
                     ctr = 0  # `i' in the specification
                     while len(pseudo_rands) < segment_length:
                         ctr += 1
-                        address_block = _compress('\0'*1024,
-                                        _compress('\0'*1024,
+                        address_block = _compress(b'\0'*1024,
+                                        _compress(b'\0'*1024,
                                             struct.pack('<QQQQQQQ',
                                                 t, l, segment, m_prime,
                                                 time_cost, type_code, ctr)
-                                            + '\0'*968))
+                                            + b'\0'*968))
                         for addr_i in range(0, 1024, 8):
                             pseudo_rands.append(
                                     struct.unpack('<II',
