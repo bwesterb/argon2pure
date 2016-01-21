@@ -1,4 +1,6 @@
-""" Pure Python implementation of the Argon2 password hash. """
+""" Pure Python implementation of the Argon2 password hash.
+
+    Bas Westerbaan  <bas@westerbaan.name> """
 
 import six
 from six.moves import range
@@ -26,6 +28,14 @@ class Argon2ParameterError(Argon2Error):
 def argon2(password, salt, time_cost, memory_cost, parallelism,
                 tag_length, secret=b'', associated_data=b'', type_code=1):
     # Compute the pre-hasing digest
+    if parallelism < 0:
+        raise Argon2ParameterError("parallelism must be strictly positive")
+    if time_cost < 0:
+        raise Argon2ParameterError("time_cost must be strictly positive")
+    if memory_cost < 8 * parallelism:
+        raise Argon2ParameterError("memory_cost can't be less than 8"
+                                    " times the number of lanes")
+
     h = Blake2b()
     h.update(struct.pack("<iiiiii", parallelism,
                                     tag_length,
@@ -41,7 +51,6 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
     h.update(secret)
     h.update(struct.pack("<i", len(associated_data)))
     h.update(associated_data)
-    #print h.hexdigest()
     H0 = h.digest()
 
     m_prime = (memory_cost // (4 * parallelism)) * (4 * parallelism)
@@ -64,6 +73,9 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
         else:
             j_start = 0
 
+        if type_code == ARGON2I:
+            pseudo_rands_by_lane = None
+
         # Compute remaining columns
         for j in range(j_start, q):
             segment = j // (q / 4)  # index of the slice/segment
@@ -71,7 +83,8 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
 
             # Argon2i computes a bunch of pseudo-random numbers
             # for every segment.
-            if type_code == ARGON2I and j % segment_length == 0:
+            if type_code == ARGON2I and (j % segment_length == 0
+                                        or pseudo_rands_by_lane is None):
                 pseudo_rands_by_lane = []
                 for l in range(parallelism):
                     # See `generate_addresses' in reference implementation
@@ -131,14 +144,9 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
                     start_pos = (segment + 1) * segment_length
                 j_prime = (start_pos + rel_pos) % q
 
-                #print 'J1=%s J2=%s i=%s j=%s   i\'=%s j\'=%s' % (
-                #        J1, J2, i, j, i_prime, j_prime)
-                #print 'ref: ', binascii.hexlify(B[i_prime][j_prime])
-                #print 'prev: ', binascii.hexlify(B[i][(j-1)%q])
                 # Mix the previous and reference block to create
                 # the next block.
                 B[i][j] = _compress(B[i][(j-1)%q], B[i_prime][j_prime])
-                #print 'next: ', binascii.hexlify(B[i][j][:8])
 
     B_final = b'\0' * 1024
 
@@ -361,16 +369,3 @@ class Blake2b(object):
         v[c] = (v[c] + v[d]) & 0xffffffffffffffff
         tmp = v[b] ^ v[c]
         v[b] = (tmp >> 63) | ((tmp << 1) & 0xffffffffffffffff)
-    
-if __name__ == '__main__':
-    print binascii.hexlify(argon2(
-        binascii.unhexlify('01010101010101010101010101010101010101010101010101'
-                           '01010101010101'),
-        binascii.unhexlify('02020202020202020202020202020202'),
-        3,
-        32,
-        4,
-        32,
-        binascii.unhexlify('0303030303030303'),
-        binascii.unhexlify('040404040404040404040404'),
-        ARGON2I))

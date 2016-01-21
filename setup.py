@@ -8,15 +8,13 @@ from setuptools import setup
 
 base_path = os.path.dirname(os.path.abspath(__file__))
 
-with open(os.path.join(base_path, '_version.py')) as f: exec(f.read())
-
 with open(os.path.join(base_path, 'README.rst')) as f:
     with open(os.path.join(base_path, 'CHANGES.rst')) as g:
         long_description = '{0}\n{1}'.format(f.read(), g.read())
 
 setup(
     name='argon2pure',
-    version=__version__,
+    version='1.dev0',  # TODO add __version__ attr. in module
     description='Pure python implementation of the ARGON2 password hash',
     long_description=long_description,
     author='Bas Westerbaan',
@@ -27,6 +25,7 @@ setup(
     install_requires=['six'],
     py_modules='argon2pure',
     test_suite='test_argon2pure',
+    tests_require=['argon2-cffi >= 16.0.0'],
     classifiers = [
             'Development Status :: 4 - Beta',
             'License :: OSI Approved :: MIT License',
