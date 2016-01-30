@@ -248,22 +248,24 @@ def _G(v, a, b, c, d):
     It is a modification of the quarter-round used in Blake2, which in turn
     is a modification of ChaCha.  See Appendix A of the specification of
     Argon2. """
-    v[a] = (v[a] + v[b] + 2 * (v[a] & 0xffffffff) * (v[b] & 0xffffffff)
+    va, vb, vc, vd = v[a], v[b], v[c], v[d]
+    va = (va + vb + 2 * (va & 0xffffffff) * (vb & 0xffffffff)
                 ) & 0xffffffffffffffff
-    tmp = v[d] ^ v[a]
-    v[d] = (tmp >> 32) | ((tmp << 32) & 0xffffffffffffffff)
-    v[c] = (v[c] + v[d] + 2 * (v[c] & 0xffffffff) * (v[d] & 0xffffffff)
+    tmp = vd ^ va
+    vd = (tmp >> 32) | ((tmp & 0xffffffff) << 32)
+    vc = (vc + vd + 2 * (vc & 0xffffffff) * (vd & 0xffffffff)
                 ) & 0xffffffffffffffff
-    tmp = v[b] ^ v[c]
-    v[b] = (tmp >> 24) | ((tmp << 40) & 0xffffffffffffffff)
-    v[a] = (v[a] + v[b] + 2 * (v[a] & 0xffffffff) * (v[b] & 0xffffffff)
+    tmp = vb ^ vc
+    vb = (tmp >> 24) | ((tmp & 0xffffff) << 40)
+    va = (va + vb + 2 * (va & 0xffffffff) * (vb & 0xffffffff)
                 ) & 0xffffffffffffffff
-    tmp = v[d] ^ v[a]
-    v[d] = (tmp >> 16) | ((tmp << 48) & 0xffffffffffffffff)
-    v[c] = (v[c] + v[d] + 2 * (v[c] & 0xffffffff) * (v[d] & 0xffffffff)
+    tmp = vd ^ va
+    vd = (tmp >> 16) | ((tmp & 0xffff) << 48)
+    vc = (vc + vd + 2 * (vc & 0xffffffff) * (vd & 0xffffffff)
                 ) & 0xffffffffffffffff
-    tmp = v[b] ^ v[c]
-    v[b] = (tmp >> 63) | ((tmp << 1) & 0xffffffffffffffff)
+    tmp = vb ^ vc
+    vb = (tmp >> 63) | ((tmp << 1) & 0xffffffffffffffff)
+    v[a], v[b], v[c], v[d] = va, vb, vc, vd
 
 
 def _H_prime(X, tag_length):
@@ -387,15 +389,17 @@ class Blake2b(object):
 
     @staticmethod
     def _G(v, m, r, i, a, b, c, d):
-        v[a] = (v[a] + v[b] + m[Blake2b.SIGMA[r][2*i]]) & 0xffffffffffffffff
-        tmp = v[d] ^ v[a]
-        v[d] = (tmp >> 32) | ((tmp << 32) & 0xffffffffffffffff)
-        v[c] = (v[c] + v[d]) & 0xffffffffffffffff
-        tmp = v[b] ^ v[c]
-        v[b] = (tmp >> 24) | ((tmp << 40) & 0xffffffffffffffff)
-        v[a] = (v[a] + v[b] + m[Blake2b.SIGMA[r][2*i+1]]) & 0xffffffffffffffff
-        tmp = v[d] ^ v[a]
-        v[d] = (tmp >> 16) | ((tmp << 48) & 0xffffffffffffffff)
-        v[c] = (v[c] + v[d]) & 0xffffffffffffffff
-        tmp = v[b] ^ v[c]
-        v[b] = (tmp >> 63) | ((tmp << 1) & 0xffffffffffffffff)
+        va, vb, vc, vd = v[a], v[b], v[c], v[d]
+        va = (va + vb + m[Blake2b.SIGMA[r][2*i]]) & 0xffffffffffffffff
+        tmp = vd ^ va
+        vd = (tmp >> 32) | ((tmp & 0xffffffff) << 32)
+        vc = (vc + vd) & 0xffffffffffffffff
+        tmp = vb ^ vc
+        vb = (tmp >> 24) | ((tmp & 0xffffff) << 40)
+        va = (va + vb + m[Blake2b.SIGMA[r][2*i+1]]) & 0xffffffffffffffff
+        tmp = vd ^ va
+        vd = (tmp >> 16) | ((tmp & 0xffff) << 48)
+        vc = (vc + vd) & 0xffffffffffffffff
+        tmp = vb ^ vc
+        vb = (tmp >> 63) | ((tmp << 1) & 0xffffffffffffffff)
+        v[a], v[b], v[c], v[d] = va, vb, vc, vd
