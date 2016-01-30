@@ -4,7 +4,9 @@ argon2pure Changelog
 1.1 (unreleased)
 ----------------
 
-- Nothing changed yet.
+Performance improvements.
+
+- Faster XORing of blocks.
 
 
 1 (2016-01-21)

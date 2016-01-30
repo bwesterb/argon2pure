@@ -173,25 +173,33 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
     B_final = b'\0' * 1024
 
     for i in range(parallelism):
-        B_final = xor(B_final, B[i][q-1])
+        B_final = xor1024(B_final, B[i][q-1])
 
     return _H_prime(B_final, tag_length)
 
 
-if six.PY3:
-    def xor(a, b):
-        return bytes([a[i] ^ b[i] for i in range(len(a))])
-else:
-    def xor(a, b):
-        return ''.join([chr(ord(a[i]) ^ ord(b[i])) for i in range(len(a))])
+# xor1024: XOR two 1024 byte blocks with eachother.
 
+if six.PY3:
+    def xor1024(a, b):
+        return (int.from_bytes(a, byteorder='little') ^
+                int.from_bytes(b, byteorder='little')).to_bytes(
+                                 1024, byteorder='little')
+else:
+    _1024B_STRUCT = struct.Struct('Q'*128)
+    def xor1024(a, b):
+        a2 = _1024B_STRUCT.unpack(a)
+        b2 = list(_1024B_STRUCT.unpack(b))
+        for i in xrange(128):
+            b2[i] ^= a2[i]
+        return _1024B_STRUCT.pack(*b2)
 
 def _compress(X, Y):
     """ Argon2's compression function G.
 
     This function is based on Blake2's compression function.
     For the definition, see section 3.4 of Argon2's specification. """
-    R = xor(X, Y)
+    R = xor1024(X, Y)
     Q = []
     Z = [None]*64
     for i in range(0, 64, 8):
@@ -208,7 +216,7 @@ def _compress(X, Y):
                     Q[i+32], Q[i+40], Q[i+48], Q[i+56])
         for j in range(8):
             Z[i + j*8] = out[j]
-    return xor(b''.join(Z), R)
+    return xor1024(b''.join(Z), R)
 
 
 def _P(S0, S1, S2, S3, S4, S5, S6, S7):
