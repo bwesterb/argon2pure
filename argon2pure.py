@@ -143,9 +143,7 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
                 i_prime = J2 % parallelism
 
                 if t == 0:
-                    if segment == 0:
-                        ref_area_size = index - 1  # TODO same as next case?
-                    elif i == i_prime:  # same_lane
+                    if segment == 0 or i == i_prime:
                         ref_area_size = j - 1
                     elif index == 0:
                         ref_area_size = segment * segment_length - 1
