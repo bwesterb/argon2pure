@@ -27,7 +27,6 @@ TODO
 ----
 
 - Optimize.
-- Use multiple threads.
 - Cover corner-cases in tests.
 
 .. _argon2: https://password-hashing.net/#argon2

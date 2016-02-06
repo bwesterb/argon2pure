@@ -7,6 +7,7 @@ argon2pure Changelog
 Performance improvements.
 
 - Faster XORing of blocks.
+- Use multiple threads if possible.
 
 
 1 (2016-01-21)
