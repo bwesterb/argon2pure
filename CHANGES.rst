@@ -1,7 +1,7 @@
 argon2pure Changelog
 ====================
 
-1.1 (unreleased)
+1.1 (2016-02-06)
 ----------------
 
 Performance improvements.
