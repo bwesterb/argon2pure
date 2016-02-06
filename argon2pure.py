@@ -85,88 +85,19 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
     # Allocate the matrix.
     B = [[None for j in range(q)] for i in range(parallelism)]
 
+    # The blocks in Argon2 are arranged in a matrix.  For each thread,
+    # there is a row, which is also called a lane.  The number of
+    # columns depends on the memory_cost.
+    # There will be time_cost passes over the whole matrix.
+    # The colums are put into groups of four, called slices.
+    # The intersection of a lane with a slice is called a segment.
+    # The matrix is filled one slice at the time.  The segments within
+    # a slice can be computed in parallel.
     for t in range(time_cost):
-        if t == 0:
-            # Compute first two columns
+        for segment in range(4):
             for i in range(parallelism):
-                B[i][0] = _H_prime(H0 + struct.pack('<II', 0, i), 1024)
-                B[i][1] = _H_prime(H0 + struct.pack('<II', 1, i), 1024)
-            j_start = 2
-        else:
-            j_start = 0
-
-        if type_code == ARGON2I:
-            pseudo_rands_by_lane = None
-
-        # Compute remaining columns
-        for j in range(j_start, q):
-            segment = j // (q // 4)  # index of the slice/segment
-            index = j % (q // 4)     # index within the segment/slice
-
-            # Argon2i computes a bunch of pseudo-random numbers
-            # for every segment.
-            if type_code == ARGON2I and (j % segment_length == 0
-                                        or pseudo_rands_by_lane is None):
-                pseudo_rands_by_lane = []
-                for l in range(parallelism):
-                    # See `generate_addresses' in reference implementation
-                    # and section 3.3 of the specification.
-                    pseudo_rands = []
-                    ctr = 0  # `i' in the specification
-                    while len(pseudo_rands) < segment_length:
-                        ctr += 1
-                        address_block = _compress(b'\0'*1024,
-                                        _compress(b'\0'*1024,
-                                            struct.pack('<QQQQQQQ',
-                                                t, l, segment, m_prime,
-                                                time_cost, type_code, ctr)
-                                            + b'\0'*968))
-                        for addr_i in range(0, 1024, 8):
-                            pseudo_rands.append(
-                                    struct.unpack('<II',
-                                        address_block[addr_i:addr_i+8]))
-                    pseudo_rands_by_lane.append(pseudo_rands)
-
-            for i in range(parallelism):
-                # See `section 3.3. Indexing' of argon2 spec.
-                # First, we derive two pseudo-random values from the current
-                # state.  This is where Argon2i and Argon2d differ.
-                if type_code == ARGON2D:
-                    J1, J2 = struct.unpack_from('<II', B[i][(j-1)%q][:8])
-                elif type_code == ARGON2I:
-                    J1, J2 = pseudo_rands_by_lane[i][index]
-                else:
-                    assert False
-
-                # Using the pseudo-random J1 and J2, we pick a reference
-                # block to mix with the previous one to create the next.
-                i_prime = J2 % parallelism
-
-                if t == 0:
-                    if segment == 0 or i == i_prime:
-                        ref_area_size = j - 1
-                    elif index == 0:
-                        ref_area_size = segment * segment_length - 1
-                    else:
-                        ref_area_size = segment * segment_length
-                elif i == i_prime:  # same_lane
-                    ref_area_size = q - segment_length + index - 1
-                elif index == 0:
-                    ref_area_size = q - segment_length - 1
-                else:
-                    ref_area_size = q - segment_length
-
-                rel_pos = (J1 ** 2) >> 32
-                rel_pos = ref_area_size - 1 - ((ref_area_size * rel_pos) >> 32)
-                start_pos = 0
-
-                if t != 0 and segment != 3:
-                    start_pos = (segment + 1) * segment_length
-                j_prime = (start_pos + rel_pos) % q
-
-                # Mix the previous and reference block to create
-                # the next block.
-                B[i][j] = _compress(B[i][(j-1)%q], B[i_prime][j_prime])
+                _fill_segment(B, t, segment, i, type_code, segment_length, H0,
+                                    q, parallelism, m_prime, time_cost)
 
     B_final = b'\0' * 1024
 
@@ -174,6 +105,72 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
         B_final = xor1024(B_final, B[i][q-1])
 
     return _H_prime(B_final, tag_length)
+
+def _fill_segment(B, t, segment, i, type_code, segment_length, H0,
+                        q, parallelism, m_prime, time_cost):
+    # Argon2i computes a bunch of pseudo-random numbers
+    # for every segment.
+    if type_code == ARGON2I:
+        # See `generate_addresses' in reference implementation
+        # and section 3.3 of the specification.
+        pseudo_rands = []
+        ctr = 0  # `i' in the specification
+        while len(pseudo_rands) < segment_length:
+            ctr += 1
+            address_block = _compress(b'\0'*1024, _compress(b'\0'*1024,
+                                struct.pack('<QQQQQQQ', t, i, segment, m_prime,
+                                                    time_cost, type_code, ctr)
+                                    + b'\0'*968))
+            for addr_i in range(0, 1024, 8):
+                pseudo_rands.append(struct.unpack('<II',
+                            address_block[addr_i:addr_i+8]))
+
+    for index in range(segment_length):
+        j = segment * segment_length + index
+        if t == 0 and j < 2:
+            # First two columns are special.
+            B[i][j] = _H_prime(H0 + struct.pack('<II', j, i), 1024)
+            continue
+
+        # See `section 3.3. Indexing' of argon2 spec.
+        # First, we derive two pseudo-random values from the current
+        # state.  This is where Argon2i and Argon2d differ.
+        if type_code == ARGON2D:
+            J1, J2 = struct.unpack_from('<II', B[i][(j-1)%q][:8])
+        elif type_code == ARGON2I:
+            J1, J2 = pseudo_rands[index]
+        else:
+            assert False
+
+        # Using the pseudo-random J1 and J2, we pick a reference
+        # block to mix with the previous one to create the next.
+        i_prime = i if t == 0 and segment == 0 else J2 % parallelism
+
+        if t == 0:
+            if segment == 0 or i == i_prime:
+                ref_area_size = j - 1
+            elif index == 0:
+                ref_area_size = segment * segment_length - 1
+            else:
+                ref_area_size = segment * segment_length
+        elif i == i_prime:  # same_lane
+            ref_area_size = q - segment_length + index - 1
+        elif index == 0:
+            ref_area_size = q - segment_length - 1
+        else:
+            ref_area_size = q - segment_length
+
+        rel_pos = (J1 ** 2) >> 32
+        rel_pos = ref_area_size - 1 - ((ref_area_size * rel_pos) >> 32)
+        start_pos = 0
+
+        if t != 0 and segment != 3:
+            start_pos = (segment + 1) * segment_length
+        j_prime = (start_pos + rel_pos) % q
+
+        # Mix the previous and reference block to create
+        # the next block.
+        B[i][j] = _compress(B[i][(j-1)%q], B[i_prime][j_prime])
 
 
 # xor1024: XOR two 1024 byte blocks with eachother.
