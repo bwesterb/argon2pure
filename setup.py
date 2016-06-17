@@ -23,7 +23,7 @@ setup(
     license='MIT',
     zip_safe=True,
     install_requires=['six'],
-    py_modules='argon2pure',
+    py_modules=['argon2pure'],
     test_suite='test_argon2pure',
     tests_require=['argon2-cffi >= 16.0.0'],
     classifiers = [
