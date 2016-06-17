@@ -1,8 +1,8 @@
 argon2pure Changelog
 ====================
 
-1.2 (unreleased)
-----------------
+1.1.1 (2016-06-17)
+------------------
 
 - Fix setup.py typo.  (Fixes #1)
 
