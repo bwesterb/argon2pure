@@ -1,7 +1,7 @@
 argon2pure Changelog
 ====================
 
-1.2 (unreleased)
+1.2 (2016-06-17)
 ----------------
 
 - Support and switch the default to Argon2 v1.3
