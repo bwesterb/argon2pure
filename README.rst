@@ -13,7 +13,7 @@ Usage
     >>> import argon2pure
     >>> from binascii import hexlify
     >>> hexlify(argon2pure.argon2('password', 'randomsalt', time_cost=1, memory_cost=16, parallelism=2))
-    '4d0e55fb28dd8408d40b103111d88081e5311706f4a35b842c463678d1fecc91'
+    '0163c5fa892819055eb07b8acb94fd2ff5273e689b34107daaaaceda648f1e1b'
 
 
 Installation
