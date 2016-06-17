@@ -1,6 +1,7 @@
 import unittest
 
 import binascii
+import itertools
 
 import argon2pure
 
@@ -10,18 +11,20 @@ import argon2  # argon2-cffi
 
 class TestArgon(unittest.TestCase):
     def _test(self, time_cost, memory_cost, parallelism):
-        for type_code in (argon2pure.ARGON2D, argon2pure.ARGON2I):
+        for type_code, version in itertools.product(
+                (argon2pure.ARGON2D, argon2pure.ARGON2I),
+                (0x10, 0x13)):
             cffi_type = (argon2.Type.I if type_code == argon2pure.ARGON2I
                                     else argon2.Type.D)
             self.assertEqual(
                     argon2.low_level.hash_secret_raw(
                         b'password', b'saltysaltsaltysalt',
                         time_cost, memory_cost, parallelism, 32,
-                        cffi_type),
+                        cffi_type, version=version),
                     argon2pure.argon2(
                         b'password', b'saltysaltsaltysalt',
                         time_cost, memory_cost, parallelism, 32,
-                        b'', b'', type_code))
+                        b'', b'', type_code, version=version))
 
     def test_base_parameters(self):
         for time_cost in range(1, 2):

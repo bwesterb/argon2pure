@@ -1,7 +1,7 @@
 argon2pure
 ==========
 
-Pure Python implementation of Argon2_ v1.0.
+Pure Python implementation of Argon2_ v1.3.
 
 You probably want to use the argon2_cffi_ or pyargon2_ bindings instead.
 
@@ -26,7 +26,6 @@ Run::
 TODO
 ----
 
-- Argon2 v1.3
 - Optimize.
 - Cover corner-cases in tests.
 

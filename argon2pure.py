@@ -31,7 +31,7 @@ class Argon2ParameterError(Argon2Error):
 
 def argon2(password, salt, time_cost, memory_cost, parallelism,
                 tag_length=32, secret=b'', associated_data=b'',
-                type_code=ARGON2I, threads=None):
+                type_code=ARGON2I, threads=None, version=0x13):
     """ Compute the Argon2 hash for *password*.
 
     :param bytes password: Password to hash
@@ -49,6 +49,8 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
     :param bytes associated_data: Optional associated data
     :param int type: variant of argon2 to use.  Either ARGON2I or ARGON2D
     :param int threads: number of threads to use to compute the hash.
+    :param int version: version of argon2 to use.  At the moment either
+        0x10 for v1.0 or 0x13 for v1.3
 
     :rtype: bytes """
     if threads is None:
@@ -64,6 +66,8 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
                                     " times the number of lanes")
     if type_code not in (0, 1):
         raise Argon2ParameterError("type_code %s not supported" % type_code)
+    if version not in (0x10, 0x13):
+        raise Argon2ParameterError("version %s not supported" % version)
 
     threads = min(parallelism, threads)
 
@@ -78,7 +82,7 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
                                     tag_length,
                                     memory_cost,
                                     time_cost,
-                                    0x10,
+                                    version,
                                     type_code))
     h.update(struct.pack("<i", len(password)))
     h.update(password)
@@ -110,14 +114,14 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
             if not worker_pool:
                 for i in range(parallelism):
                     _fill_segment(B, t, segment, i, type_code, segment_length,
-                                    H0, q, parallelism, m_prime, time_cost)
+                                H0, q, parallelism, m_prime, time_cost, version)
                 continue
 
             handles = [None]*parallelism
             for i in range(parallelism):
                 handles[i] = worker_pool.apply_async(_fill_segment,
-                                (B, t, segment, i, type_code, segment_length,
-                                    H0, q, parallelism, m_prime, time_cost))
+                            (B, t, segment, i, type_code, segment_length, H0,
+                                q, parallelism, m_prime, time_cost, version))
             for i in range(parallelism):
                 new_blocks = handles[i].get()
                 for index in range(segment_length):
@@ -131,7 +135,7 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
     return _H_prime(B_final, tag_length)
 
 def _fill_segment(B, t, segment, i, type_code, segment_length, H0,
-                        q, parallelism, m_prime, time_cost):
+                        q, parallelism, m_prime, time_cost, version):
     # Argon2i computes a bunch of pseudo-random numbers
     # for every segment.
     if type_code == ARGON2I:
@@ -194,7 +198,10 @@ def _fill_segment(B, t, segment, i, type_code, segment_length, H0,
 
         # Mix the previous and reference block to create
         # the next block.
-        B[i][j] = _compress(B[i][(j-1)%q], B[i_prime][j_prime])
+        new_block = _compress(B[i][(j-1)%q], B[i_prime][j_prime])
+        if t != 0 and version == 0x13:
+            new_block = xor1024(B[i][j], new_block)
+        B[i][j] = new_block
 
     # If we are run in a separate thread, then B is a copy.  Return changes.
     return B[i][segment*segment_length:(segment+1)*segment_length]
