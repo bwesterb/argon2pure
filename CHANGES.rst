@@ -1,8 +1,8 @@
 argon2pure Changelog
 ====================
 
-1.3 (unreleased)
-----------------
+1.2.2 (2016-06-18)
+------------------
 
 - Add ARGON2_VERSIONS constant.  (Eli Collins)
 
