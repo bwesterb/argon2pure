@@ -17,11 +17,16 @@ __all__ = [
     'argon2',
     'ARGON2D',
     'ARGON2I',
+    'ARGON2_DEFAULT_VERSION',
+    'ARGON2_VERSIONS',
     'Argon2Error',
     'Argon2ParameterError']
 
 ARGON2I = 1
 ARGON2D = 0
+
+ARGON2_VERSIONS = (0x10, 0x13)
+ARGON2_DEFAULT_VERSION = ARGON2_VERSIONS[-1]
 
 class Argon2Error(Exception):
     pass
@@ -31,7 +36,7 @@ class Argon2ParameterError(Argon2Error):
 
 def argon2(password, salt, time_cost, memory_cost, parallelism,
                 tag_length=32, secret=b'', associated_data=b'',
-                type_code=ARGON2I, threads=None, version=0x13):
+                type_code=ARGON2I, threads=None, version=ARGON2_DEFAULT_VERSION):
     """ Compute the Argon2 hash for *password*.
 
     :param bytes password: Password to hash
@@ -66,7 +71,7 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
                                     " times the number of lanes")
     if type_code not in (0, 1):
         raise Argon2ParameterError("type_code %s not supported" % type_code)
-    if version not in (0x10, 0x13):
+    if version not in ARGON2_VERSIONS:
         raise Argon2ParameterError("version %s not supported" % version)
 
     threads = min(parallelism, threads)
