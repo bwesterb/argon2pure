@@ -4,7 +4,7 @@ argon2pure Changelog
 1.3 (unreleased)
 ----------------
 
-- Nothing changed yet.
+- Add ARGON2_VERSIONS constant.  (Eli Collins)
 
 
 1.2 (2016-06-17)
