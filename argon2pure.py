@@ -11,7 +11,7 @@ from six import BytesIO
 
 import struct
 import binascii
-import multiprocessing
+import multiprocessing.dummy
 
 __all__ = [
     'argon2',
@@ -36,7 +36,8 @@ class Argon2ParameterError(Argon2Error):
 
 def argon2(password, salt, time_cost, memory_cost, parallelism,
                 tag_length=32, secret=b'', associated_data=b'',
-                type_code=ARGON2I, threads=None, version=ARGON2_DEFAULT_VERSION):
+                type_code=ARGON2I, threads=None, version=ARGON2_DEFAULT_VERSION,
+                use_threads=False):
     """ Compute the Argon2 hash for *password*.
 
     :param bytes password: Password to hash
@@ -54,6 +55,7 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
     :param bytes associated_data: Optional associated data
     :param int type: variant of argon2 to use.  Either ARGON2I or ARGON2D
     :param int threads: number of threads to use to compute the hash.
+    :param bool use_threads: if true, signal multiprocessing to use threads rather than processes.
     :param int version: version of argon2 to use.  At the moment either
         0x10 for v1.0 or 0x13 for v1.3
 
@@ -79,7 +81,11 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
     if threads == 1:
         worker_pool = None
     else:
-        worker_pool = multiprocessing.Pool(processes=threads)
+        if use_threads:
+            Pool = multiprocessing.dummy.Pool
+        else:
+            Pool = multiprocessing.Pool
+        worker_pool = Pool(processes=threads)
 
     # Compute the pre-hasing digest
     h = Blake2b()
