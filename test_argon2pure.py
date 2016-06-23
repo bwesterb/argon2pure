@@ -36,6 +36,12 @@ class TestArgon(unittest.TestCase):
             memory_cost = 16 + (4 ** exponent)
             self._test(2, memory_cost, 2)
 
+    # def test_heavy_load(self):
+    #     # make sure pool workers are cleaned up after call,
+    #     # so they don't accumulate until pool is GC'ed
+    #     for _ in range(200):
+    #         argon2(b"p", b"s", time_cost=1, memory_cost=16, parallelism=2)
+
 class TestBlake2b(unittest.TestCase):
     def test_blake2b_keyed(self):
         cur = b'!'

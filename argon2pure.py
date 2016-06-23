@@ -140,6 +140,10 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
                 for index in range(segment_length):
                     B[i][segment * segment_length + index] = new_blocks[index]
 
+    if worker_pool:
+        # don't let workers sit around until pool is GC'd
+        worker_pool.close()
+
     B_final = b'\0' * 1024
 
     for i in range(parallelism):
