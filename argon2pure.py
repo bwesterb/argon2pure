@@ -11,6 +11,7 @@ from six import BytesIO
 
 import struct
 import binascii
+import multiprocessing
 import multiprocessing.dummy
 
 __all__ = [
@@ -55,7 +56,8 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
     :param bytes associated_data: Optional associated data
     :param int type: variant of argon2 to use.  Either ARGON2I or ARGON2D
     :param int threads: number of threads to use to compute the hash.
-    :param bool use_threads: if true, signal multiprocessing to use threads rather than processes.
+    :param bool use_threads: if true, signal multiprocessing to use threads
+        rather than processes.
     :param int version: version of argon2 to use.  At the moment either
         0x10 for v1.0 or 0x13 for v1.3
 

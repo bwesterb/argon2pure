@@ -4,7 +4,7 @@ argon2pure Changelog
 1.3 (unreleased)
 ----------------
 
-- Nothing changed yet.
+- Add use_threads flag to use threads instead of processes.  (Eli Collins)
 
 
 1.2.2 (2016-06-18)
