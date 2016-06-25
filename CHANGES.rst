@@ -4,7 +4,9 @@ argon2pure Changelog
 1.3 (unreleased)
 ----------------
 
-- Nothing changed yet.
+- Close worker pool explicitly.  For CPython this makes no difference, but
+  for a Python implementation without reference counting, like PyPy, this
+  will drastically decrease memory usage.  (Eli Collins)
 
 
 1.2.3 (2016-06-23)
