@@ -1,8 +1,8 @@
 argon2pure Changelog
 ====================
 
-1.3 (unreleased)
-----------------
+1.2.4 (2016-06-25)
+------------------
 
 - Close worker pool explicitly.  For CPython this makes no difference, but
   for a Python implementation without reference counting, like PyPy, this

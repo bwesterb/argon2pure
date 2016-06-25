@@ -14,7 +14,7 @@ with open(os.path.join(base_path, 'README.rst')) as f:
 
 setup(
     name='argon2pure',
-    version='1.3.dev0',
+    version='1.2.4',
     description='Pure python implementation of the ARGON2 password hash',
     long_description=long_description,
     author='Bas Westerbaan',
