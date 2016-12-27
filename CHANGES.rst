@@ -4,7 +4,8 @@ argon2pure Changelog
 1.3 (unreleased)
 ----------------
 
-- Nothing changed yet.
+- Support ARGON2ID.
+- Add ARGON2_TYPES constant.
 
 
 1.2.4 (2016-06-25)

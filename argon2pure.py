@@ -23,11 +23,13 @@ __all__ = [
     'Argon2Error',
     'Argon2ParameterError']
 
-ARGON2I = 1
-ARGON2D = 0
+ARGON2D  = 0
+ARGON2I  = 1
+ARGON2ID = 2
 
 ARGON2_VERSIONS = (0x10, 0x13)
 ARGON2_DEFAULT_VERSION = ARGON2_VERSIONS[-1]
+ARGON2_TYPES = (ARGON2D, ARGON2I, ARGON2ID)
 
 class Argon2Error(Exception):
     pass
@@ -73,7 +75,7 @@ def argon2(password, salt, time_cost, memory_cost, parallelism,
     if memory_cost < 8 * parallelism:
         raise Argon2ParameterError("memory_cost can't be less than 8"
                                     " times the number of lanes")
-    if type_code not in (0, 1):
+    if type_code not in ARGON2_TYPES:
         raise Argon2ParameterError("type_code %s not supported" % type_code)
     if version not in ARGON2_VERSIONS:
         raise Argon2ParameterError("version %s not supported" % version)
@@ -155,7 +157,9 @@ def _fill_segment(B, t, segment, i, type_code, segment_length, H0,
                         q, parallelism, m_prime, time_cost, version):
     # Argon2i computes a bunch of pseudo-random numbers
     # for every segment.
-    if type_code == ARGON2I:
+    data_independant = ((type_code == ARGON2I)
+            or (type_code == ARGON2ID and t == 0 and segment <= 1))
+    if data_independant:
         # See `generate_addresses' in reference implementation
         # and section 3.3 of the specification.
         pseudo_rands = []
@@ -180,12 +184,10 @@ def _fill_segment(B, t, segment, i, type_code, segment_length, H0,
         # See `section 3.3. Indexing' of argon2 spec.
         # First, we derive two pseudo-random values from the current
         # state.  This is where Argon2i and Argon2d differ.
-        if type_code == ARGON2D:
-            J1, J2 = struct.unpack_from('<II', B[i][(j-1)%q][:8])
-        elif type_code == ARGON2I:
+        if data_independant:
             J1, J2 = pseudo_rands[index]
         else:
-            assert False
+            J1, J2 = struct.unpack_from('<II', B[i][(j-1)%q][:8])
 
         # Using the pseudo-random J1 and J2, we pick a reference
         # block to mix with the previous one to create the next.

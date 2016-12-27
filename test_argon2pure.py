@@ -12,10 +12,11 @@ import argon2  # argon2-cffi
 class TestArgon(unittest.TestCase):
     def _test(self, time_cost, memory_cost, parallelism):
         for type_code, version in itertools.product(
-                (argon2pure.ARGON2D, argon2pure.ARGON2I),
+                (argon2pure.ARGON2D, argon2pure.ARGON2I, argon2pure.ARGON2ID),
                 (0x10, 0x13)):
-            cffi_type = (argon2.Type.I if type_code == argon2pure.ARGON2I
-                                    else argon2.Type.D)
+            cffi_type = {argon2pure.ARGON2I: argon2.Type.I,
+                         argon2pure.ARGON2D: argon2.Type.D,
+                         argon2pure.ARGON2ID: argon2.Type.ID}[type_code]
             self.assertEqual(
                     argon2.low_level.hash_secret_raw(
                         b'password', b'saltysaltsaltysalt',
