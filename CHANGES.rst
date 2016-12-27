@@ -1,6 +1,12 @@
 argon2pure Changelog
 ====================
 
+1.4 (unreleased)
+----------------
+
+- Nothing changed yet.
+
+
 1.3 (2016-12-27)
 ----------------
 
