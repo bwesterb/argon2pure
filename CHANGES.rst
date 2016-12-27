@@ -1,7 +1,7 @@
 argon2pure Changelog
 ====================
 
-1.3 (unreleased)
+1.3 (2016-12-27)
 ----------------
 
 - Support ARGON2ID.
