@@ -6,6 +6,7 @@ argon2pure Changelog
 
 - Support ARGON2ID.
 - Add ARGON2_TYPES constant.
+- Python 3.6 support.
 
 
 1.2.4 (2016-06-25)
