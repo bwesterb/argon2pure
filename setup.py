@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import os
-import sys
 import os.path
 
 from setuptools import setup
@@ -26,7 +25,7 @@ setup(
     py_modules=['argon2pure'],
     test_suite='test_argon2pure',
     tests_require=['argon2-cffi >= 16.3.0'],
-    classifiers = [
+    classifiers=[
             'Development Status :: 4 - Beta',
             'License :: OSI Approved :: MIT License',
             'Operating System :: POSIX',
@@ -38,5 +37,5 @@ setup(
             'Programming Language :: Python :: 3.4',
             'Programming Language :: Python :: 3.5',
             'Programming Language :: Python :: 3.6',
-        ],
-    ),
+    ],
+),
