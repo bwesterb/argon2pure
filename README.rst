@@ -12,7 +12,7 @@ Usage
 
     >>> import argon2pure
     >>> from binascii import hexlify
-    >>> hexlify(argon2pure.argon2('password', 'randomsalt', time_cost=1, memory_cost=16, parallelism=2))
+    >>> hexlify(argon2pure.argon2(b'password', b'randomsalt', time_cost=1, memory_cost=16, parallelism=2))
     '0163c5fa892819055eb07b8acb94fd2ff5273e689b34107daaaaceda648f1e1b'
 
 
